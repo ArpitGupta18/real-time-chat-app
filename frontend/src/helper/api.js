@@ -6,10 +6,10 @@ export async function createGroup(name, creatorId) {
 	return data;
 }
 
-export async function ensureDirect(userAId, userBId) {
-	const data = await http.post("/rooms/direct", { userAId, userBId });
-	return data;
-}
+// export async function ensureDirect(userAId, userBId) {
+// 	const data = await http.post("/rooms/direct", { userAId, userBId });
+// 	return data;
+// }
 
 export async function listMyRooms(userId) {
 	const data = await http.get(`/rooms/mine/${userId}`);
@@ -22,4 +22,14 @@ export async function inviteToRoom(roomId, { username, userId }) {
 		userId,
 	});
 	return data;
+}
+
+export async function ensureDirectRoom(userAId, userBId) {
+	const data = await http.post("/rooms/direct", { userAId, userBId });
+	return data;
+}
+
+export async function findUserByUsername(username) {
+	const res = await http.get(`/rooms/users/by-name/${username}`);
+	return res;
 }

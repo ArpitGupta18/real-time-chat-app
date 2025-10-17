@@ -109,7 +109,17 @@ router.get("/mine/:userId", async (req, res) => {
 						  }
 						: null;
 
-					return { ...r.toJSON(), members, lastMessage };
+					let displayName = r.name;
+					if (!r.is_group) {
+						const users = await r.getUsers({
+							attributes: ["id", "username"],
+						});
+						const other = users.find(
+							(u) => String(u.id) !== String(userId)
+						);
+						displayName = other ? other.username : "Direct Chat";
+					}
+					return { ...r.toJSON(), members, lastMessage, displayName };
 				} catch {
 					return { ...r.toJSON(), members: null, lastMessage: null };
 				}
@@ -211,4 +221,13 @@ router.post("/:roomId/invite", async (req, res) => {
 		return res.status(500).json({ ok: false, error: "invite_failed" });
 	}
 });
+
+router.get("/users/by-name/:username", async (req, res) => {
+	const user = await User.findOne({
+		where: { username: req.params.username },
+	});
+	if (!user) return res.json({ ok: false, error: "user_not_found" });
+	res.json({ ok: true, user });
+});
+
 export default router;

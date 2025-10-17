@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { socketApi } from "./helper/socketApi";
-import { listMyRooms, createGroup, inviteToRoom } from "./helper/api";
+import {
+	listMyRooms,
+	createGroup,
+	inviteToRoom,
+	ensureDirectRoom,
+	findUserByUsername,
+} from "./helper/api";
 
 const App = () => {
 	const [user, setUser] = useState(null);
@@ -225,6 +231,36 @@ const App = () => {
 		}
 	};
 
+	const addDirectUser = async () => {
+		const targetName = prompt("Start chat with username:");
+		if (!targetName?.trim()) return;
+		try {
+			const find = await findUserByUsername(targetName.trim());
+			if (!find.ok || !find.user) return alert("User not found");
+
+			const targetUser = find.user;
+
+			const res = await ensureDirectRoom(user.id, targetUser.id);
+			if (!res.ok) return alert(res.error || "Failed to create DM");
+
+			const room = {
+				...res.room,
+				is_group: false,
+				displayName: targetUser.username,
+			};
+
+			await socketApi.joinRoom({ roomId: room.id });
+
+			const updated = await listMyRooms(user.id);
+			if (updated.ok) setRooms(updated.rooms);
+			// setRooms((prev) => [room, ...prev.filter((r) => r.id !== room.id)]);
+			setActiveRoom(room);
+		} catch (e) {
+			console.error(e);
+			alert("Failed to start DM");
+		}
+	};
+
 	const createSampleGroup = async () => {
 		const name = prompt("Group name?");
 		if (!name?.trim()) return;
@@ -234,9 +270,6 @@ const App = () => {
 			if (res.ok) {
 				const r = await listMyRooms(user.id);
 				if (r.ok) setRooms(r.rooms);
-				// or simply:
-				//
-				// setRooms((r) => [...r, res.room]);
 			}
 		} catch (e) {
 			alert("Failed to create group");
@@ -282,6 +315,10 @@ const App = () => {
 				</div>
 				<button onClick={createSampleGroup}>+ New group</button>
 
+				<button onClick={addDirectUser} style={{ marginLeft: "8px" }}>
+					+ New DM
+				</button>
+
 				<div style={{ marginTop: 12, fontWeight: 600 }}>My rooms</div>
 				<ul style={{ listStyle: "none", padding: 0 }}>
 					{rooms.map((r) => {
@@ -303,11 +340,15 @@ const App = () => {
 									onClick={() => joinRoom(r)}
 								>
 									<div style={{ fontWeight: 600 }}>
-										{r.name} {r.is_group ? "" : "(DM)"}{" "}
-										{r.members ? `· ${r.members}` : ""}
+										{r.is_group
+											? r.name
+											: r.displayName ||
+											  "Direct Message"}{" "}
+										{r.members && r.is_group
+											? `· ${r.members}`
+											: ""}
 									</div>
 
-									{/* last message preview (username: content) */}
 									{previewText ? (
 										<div
 											style={{
@@ -350,7 +391,11 @@ const App = () => {
 						alignItems: "center",
 					}}
 				>
-					{activeRoom ? <b>{activeRoom.name}</b> : "Select a room"}
+					{activeRoom ? (
+						<b>{activeRoom.displayName || activeRoom.name}</b>
+					) : (
+						"Select a room"
+					)}
 
 					<div>
 						{activeRoom?.is_group && (
@@ -366,6 +411,7 @@ const App = () => {
 						)}
 					</div>
 				</div>
+
 				<div
 					style={{
 						flex: 1,
